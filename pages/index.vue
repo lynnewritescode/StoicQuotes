@@ -15,28 +15,29 @@
           :quote="quote"
           :author="author"
         />
-        <div class="call-to-action">
-          <button
-            class="refresh"
-            tab-index="0"
-            title="Generate a new quote"
-            aria-describedby="refreshQuote"
-            @click="getQuote()"
-          >
-            <unicon
-              name="redo"
-              fill="#526488"
-            />
-          </button>
-          <div
-            id="refreshQuote"
-            class="aria-helper"
-          >
-            This will refresh the quote displayed on the page.
-          </div>
-        </div>
       </main>
     </transition>
+    <div class="call-to-action">
+      <button
+        class="refresh"
+        :class="{'active': isActive}"
+        tab-index="0"
+        title="Generate a new quote"
+        aria-describedby="refreshQuote"
+        @click="getQuote()"
+      >
+        <unicon
+          name="redo"
+          fill="#526488"
+        />
+      </button>
+      <div
+        id="refreshQuote"
+        class="aria-helper"
+      >
+        This will refresh the quote displayed on the page.
+      </div>
+    </div>
   </section>
 </template>
 
@@ -54,7 +55,8 @@ export default {
     return {
       show: false,
       quote: null,
-      author: null
+      author: null,
+      isActive: false
     }
   },
 
@@ -66,11 +68,13 @@ export default {
     getQuote: function() {
       const scope = this
       this.show = false
+      this.isActive = true
       const quote = quotes[Math.floor(Math.random() * quotes.length)]
       this.quote = quote.quote
       this.author = quote.author
       setTimeout(function() {
         scope.show = true
+        scope.isActive = false
       }, 500)
     }
   }

@@ -12,7 +12,9 @@
   display: block;
   margin-top: 40px;
   position: fixed;
+  left: 0;
   bottom: 30px;
+  width: 100%;
 }
 
 .refresh {
@@ -26,6 +28,17 @@
   appearance: none;
   transition: background 0.2s ease-in-out;
   cursor: pointer;
+
+  svg {
+    transform-origin: center;
+  }
+
+  &.active {
+    svg {
+      transform: rotate(360deg);
+      transition: transform 0.5s ease-in-out;
+    }
+  }
 
   &:hover {
     background: darken(#f3f3f3, 4%);
