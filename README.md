@@ -1,6 +1,6 @@
-# stoic-quote-generator
+# Stoic Quote Generator
 
-> My delightful Nuxt.js project
+> A Nuxt.js project to generate random stoic quotes.
 
 ## Build Setup
 
