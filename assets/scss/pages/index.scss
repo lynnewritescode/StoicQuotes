@@ -1,0 +1,41 @@
+.quote-wrapper {
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 100px;
+}
+
+.call-to-action {
+  display: block;
+  margin-top: 40px;
+  position: fixed;
+  bottom: 30px;
+}
+
+.refresh {
+  border: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #f3f3f3;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  transition: background 0.2s ease-in-out;
+  cursor: pointer;
+
+  &:hover {
+    background: darken(#f3f3f3, 4%);
+  }
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.aria-helper {
+  display: none;
+}
