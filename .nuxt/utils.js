@@ -1,7 +1,5 @@
 import Vue from 'vue'
 
-const noopData = () => ({})
-
 // window.{{globals.loadedCallback}} hook
 // Useful for jsdom testing or plugins (https://github.com/tmpvar/jsdom#dealing-with-asynchronous-script-loading)
 if (process.client) {
@@ -11,38 +9,46 @@ if (process.client) {
   }
 }
 
-export function empty() {}
+export function empty () {}
 
-export function globalHandleError(error) {
+export function globalHandleError (error) {
   if (Vue.config.errorHandler) {
     Vue.config.errorHandler(error)
   }
 }
 
-export function interopDefault(promise) {
+export function interopDefault (promise) {
   return promise.then(m => m.default || m)
 }
 
-export function applyAsyncData(Component, asyncData) {
-  const ComponentData = Component.options.data || noopData
-  // Prevent calling this method for each request on SSR context
-  if (!asyncData && Component.options.hasAsyncData) {
+export function applyAsyncData (Component, asyncData) {
+  if (
+    // For SSR, we once all this function without second param to just apply asyncData
+    // Prevent doing this for each SSR request
+    !asyncData && Component.options.__hasNuxtData
+  ) {
     return
   }
-  Component.options.hasAsyncData = true
+
+  const ComponentData = Component.options._originDataFn || Component.options.data || function () { return {} }
+  Component.options._originDataFn = ComponentData
+
   Component.options.data = function () {
-    const data = ComponentData.call(this)
+    const data = ComponentData.call(this, this)
     if (this.$ssrContext) {
       asyncData = this.$ssrContext.asyncData[Component.cid]
     }
     return { ...data, ...asyncData }
   }
+
+  Component.options.__hasNuxtData = true
+
   if (Component._Ctor && Component._Ctor.options) {
     Component._Ctor.options.data = Component.options.data
   }
 }
 
-export function sanitizeComponent(Component) {
+export function sanitizeComponent (Component) {
   // If Component already sanitized
   if (Component.options && Component._Ctor === Component) {
     return Component
@@ -61,25 +67,20 @@ export function sanitizeComponent(Component) {
   return Component
 }
 
-export function getMatchedComponents(route, matches = false) {
+export function getMatchedComponents (route, matches = false, prop = 'components') {
   return Array.prototype.concat.apply([], route.matched.map((m, index) => {
-    return Object.keys(m.components).map((key) => {
+    return Object.keys(m[prop]).map((key) => {
       matches && matches.push(index)
-      return m.components[key]
+      return m[prop][key]
     })
   }))
 }
 
-export function getMatchedComponentsInstances(route, matches = false) {
-  return Array.prototype.concat.apply([], route.matched.map((m, index) => {
-    return Object.keys(m.instances).map((key) => {
-      matches && matches.push(index)
-      return m.instances[key]
-    })
-  }))
+export function getMatchedComponentsInstances (route, matches = false) {
+  return getMatchedComponents(route, matches, 'instances')
 }
 
-export function flatMapComponents(route, fn) {
+export function flatMapComponents (route, fn) {
   return Array.prototype.concat.apply([], route.matched.map((m, index) => {
     return Object.keys(m.components).reduce((promises, key) => {
       if (m.components[key]) {
@@ -92,20 +93,23 @@ export function flatMapComponents(route, fn) {
   }))
 }
 
-export function resolveRouteComponents(route) {
+export function resolveRouteComponents (route, fn) {
   return Promise.all(
-    flatMapComponents(route, async (Component, _, match, key) => {
+    flatMapComponents(route, async (Component, instance, match, key) => {
       // If component is a function, resolve it
       if (typeof Component === 'function' && !Component.options) {
         Component = await Component()
       }
-      match.components[key] = sanitizeComponent(Component)
-      return match.components[key]
+      match.components[key] = Component = sanitizeComponent(Component)
+      return typeof fn === 'function' ? fn(Component, instance, match, key) : Component
     })
   )
 }
 
-export async function getRouteData(route) {
+export async function getRouteData (route) {
+  if (!route) {
+    return
+  }
   // Make sure the components are resolved (code-splitting)
   await resolveRouteComponents(route)
   // Send back a copy of route with meta based on Component definition
@@ -117,12 +121,12 @@ export async function getRouteData(route) {
   }
 }
 
-export async function setContext(app, context) {
+export async function setContext (app, context) {
   // If context not defined, create it
   if (!app.context) {
     app.context = {
       isStatic: process.static,
-      isDev: true,
+      isDev: false,
       isHMR: false,
       app,
 
@@ -132,8 +136,15 @@ export async function setContext(app, context) {
       env: {}
     }
     // Only set once
-    if (context.req) app.context.req = context.req
-    if (context.res) app.context.res = context.res
+    if (context.req) {
+      app.context.req = context.req
+    }
+    if (context.res) {
+      app.context.res = context.res
+    }
+    if (context.ssrContext) {
+      app.context.ssrContext = context.ssrContext
+    }
     app.context.redirect = (status, path, query) => {
       if (!status) {
         return
@@ -148,21 +159,21 @@ export async function setContext(app, context) {
         status = 302
       }
       if (pathType === 'object') {
-        path = app.router.resolve(path).href
+        path = app.router.resolve(path).route.fullPath
       }
       // "/absolute/route", "./relative/route" or "../relative/route"
       if (/(^[.]{1,2}\/)|(^\/(?!\/))/.test(path)) {
         app.context.next({
-          path: path,
-          query: query,
-          status: status
+          path,
+          query,
+          status
         })
       } else {
         path = formatUrl(path, query)
         if (process.server) {
           app.context.next({
-            path: path,
-            status: status
+            path,
+            status
           })
         }
         if (process.client) {
@@ -181,22 +192,30 @@ export async function setContext(app, context) {
       app.context.nuxtState = window.__NUXT__
     }
   }
+
   // Dynamic keys
+  const [currentRouteData, fromRouteData] = await Promise.all([
+    getRouteData(context.route),
+    getRouteData(context.from)
+  ])
+
+  if (context.route) {
+    app.context.route = currentRouteData
+  }
+
+  if (context.from) {
+    app.context.from = fromRouteData
+  }
+
   app.context.next = context.next
   app.context._redirected = false
   app.context._errored = false
-  app.context.isHMR = !!context.isHMR
-  if (context.route) {
-    app.context.route = await getRouteData(context.route)
-  }
+  app.context.isHMR = false
   app.context.params = app.context.route.params || {}
   app.context.query = app.context.route.query || {}
-  if (context.from) {
-    app.context.from = await getRouteData(context.from)
-  }
 }
 
-export function middlewareSeries(promises, appContext) {
+export function middlewareSeries (promises, appContext) {
   if (!promises.length || appContext._redirected || appContext._errored) {
     return Promise.resolve()
   }
@@ -206,12 +225,9 @@ export function middlewareSeries(promises, appContext) {
     })
 }
 
-export function promisify(fn, context) {
+export function promisify (fn, context) {
   let promise
   if (fn.length === 2) {
-      console.warn('Callback-based asyncData, fetch or middleware calls are deprecated. ' +
-        'Please switch to promises or async/await syntax')
-
     // fn(context, callback)
     promise = new Promise((resolve) => {
       fn(context, function (err, data) {
@@ -225,26 +241,23 @@ export function promisify(fn, context) {
   } else {
     promise = fn(context)
   }
-  if (!promise || (!(promise instanceof Promise) && (typeof promise.then !== 'function'))) {
-    promise = Promise.resolve(promise)
+
+  if (promise && promise instanceof Promise && typeof promise.then === 'function') {
+    return promise
   }
-  return promise
+  return Promise.resolve(promise)
 }
 
 // Imported from vue-router
-export function getLocation(base, mode) {
-  let path = window.location.pathname
+export function getLocation (base, mode) {
+  let path = decodeURI(window.location.pathname)
   if (mode === 'hash') {
     return window.location.hash.replace(/^#\//, '')
   }
   if (base && path.indexOf(base) === 0) {
     path = path.slice(base.length)
   }
-  return decodeURI(path || '/') + window.location.search + window.location.hash
-}
-
-export function urlJoin() {
-  return Array.prototype.slice.call(arguments).join('/').replace(/\/+/g, '/')
+  return (path || '/') + window.location.search + window.location.hash
 }
 
 // Imported from path-to-regexp
@@ -256,11 +269,11 @@ export function urlJoin() {
  * @param  {Object=}            options
  * @return {!function(Object=, Object=)}
  */
-export function compile(str, options) {
+export function compile (str, options) {
   return tokensToFunction(parse(str, options))
 }
 
-export function getQueryDiff(toQuery, fromQuery) {
+export function getQueryDiff (toQuery, fromQuery) {
   const diff = {}
   const queries = { ...toQuery, ...fromQuery }
   for (const k in queries) {
@@ -271,7 +284,7 @@ export function getQueryDiff(toQuery, fromQuery) {
   return diff
 }
 
-export function normalizeError(err) {
+export function normalizeError (err) {
   let message
   if (!(err.message || typeof err === 'string')) {
     try {
@@ -284,7 +297,7 @@ export function normalizeError(err) {
   }
   return {
     ...err,
-    message: message,
+    message,
     statusCode: (err.statusCode || err.status || (err.response && err.response.status) || 500)
   }
 }
@@ -314,7 +327,7 @@ const PATH_REGEXP = new RegExp([
  * @param  {Object=} options
  * @return {!Array}
  */
-function parse(str, options) {
+function parse (str, options) {
   const tokens = []
   let key = 0
   let index = 0
@@ -358,11 +371,11 @@ function parse(str, options) {
     tokens.push({
       name: name || key++,
       prefix: prefix || '',
-      delimiter: delimiter,
-      optional: optional,
-      repeat: repeat,
-      partial: partial,
-      asterisk: !!asterisk,
+      delimiter,
+      optional,
+      repeat,
+      partial,
+      asterisk: Boolean(asterisk),
       pattern: pattern ? escapeGroup(pattern) : (asterisk ? '.*' : '[^' + escapeString(delimiter) + ']+?')
     })
   }
@@ -386,8 +399,9 @@ function parse(str, options) {
  * @param  {string}
  * @return {string}
  */
-function encodeURIComponentPretty(str) {
-  return encodeURI(str).replace(/[/?#]/g, (c) => {
+function encodeURIComponentPretty (str, slashAllowed) {
+  const re = slashAllowed ? /[?#]/g : /[/?#]/g
+  return encodeURI(str).replace(re, (c) => {
     return '%' + c.charCodeAt(0).toString(16).toUpperCase()
   })
 }
@@ -398,16 +412,34 @@ function encodeURIComponentPretty(str) {
  * @param  {string}
  * @return {string}
  */
-function encodeAsterisk(str) {
-  return encodeURI(str).replace(/[?#]/g, (c) => {
-    return '%' + c.charCodeAt(0).toString(16).toUpperCase()
-  })
+function encodeAsterisk (str) {
+  return encodeURIComponentPretty(str, true)
+}
+
+/**
+ * Escape a regular expression string.
+ *
+ * @param  {string} str
+ * @return {string}
+ */
+function escapeString (str) {
+  return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, '\\$1')
+}
+
+/**
+ * Escape the capturing group by escaping special characters and meaning.
+ *
+ * @param  {string} group
+ * @return {string}
+ */
+function escapeGroup (group) {
+  return group.replace(/([=!:$/()])/g, '\\$1')
 }
 
 /**
  * Expose a method for transforming tokens into the path function.
  */
-function tokensToFunction(tokens) {
+function tokensToFunction (tokens) {
   // Compile all the tokens into regexps.
   const matches = new Array(tokens.length)
 
@@ -489,33 +521,13 @@ function tokensToFunction(tokens) {
 }
 
 /**
- * Escape a regular expression string.
- *
- * @param  {string} str
- * @return {string}
- */
-function escapeString(str) {
-  return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, '\\$1')
-}
-
-/**
- * Escape the capturing group by escaping special characters and meaning.
- *
- * @param  {string} group
- * @return {string}
- */
-function escapeGroup(group) {
-  return group.replace(/([=!:$/()])/g, '\\$1')
-}
-
-/**
  * Format given url, append query to url query string
  *
  * @param  {string} url
  * @param  {string} query
  * @return {string}
  */
-function formatUrl(url, query) {
+function formatUrl (url, query) {
   let protocol
   const index = url.indexOf('://')
   if (index !== -1) {
@@ -532,8 +544,7 @@ function formatUrl(url, query) {
   let hash
   parts = path.split('#')
   if (parts.length === 2) {
-    path = parts[0]
-    hash = parts[1]
+    [path, hash] = parts
   }
 
   result += path ? '/' + path : ''
@@ -552,7 +563,7 @@ function formatUrl(url, query) {
  * @param  {object} query
  * @return {string}
  */
-function formatQuery(query) {
+function formatQuery (query) {
   return Object.keys(query).sort().map((key) => {
     const val = query[key]
     if (val == null) {
