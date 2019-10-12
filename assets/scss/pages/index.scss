@@ -1,20 +1,17 @@
 .quote-wrapper {
   margin: 0 auto;
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
-  min-height: 100vh;
   align-items: center;
   justify-content: center;
-  padding-bottom: 100px;
+  padding: 100px 0 0;
 }
 
 .call-to-action {
+  width: 100%;
   display: block;
   margin-top: 40px;
-  position: fixed;
-  left: 0;
-  bottom: 30px;
-  width: 100%;
 }
 
 .refresh {
@@ -22,7 +19,7 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: #f3f3f3;
+  background: #484c7f;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -41,7 +38,12 @@
   }
 
   &:hover {
-    background: darken(#f3f3f3, 4%);
+    background: darken(#484c7f, 6%);
+
+    svg {
+      transform: rotate(360deg);
+      transition: transform 0.5s ease-in-out;
+    }
   }
 
   &:focus {
@@ -51,4 +53,10 @@
 
 .aria-helper {
   display: none;
+}
+
+@media (min-width: 767px) {
+  .quote-wrapper {
+    padding: 150px 0 0;
+  }
 }

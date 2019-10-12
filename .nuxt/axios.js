@@ -135,10 +135,11 @@ export default (ctx, inject) => {
   delete axiosOptions.headers.common['host']
   delete axiosOptions.headers.common['cf-ray']
   delete axiosOptions.headers.common['cf-connecting-ip']
+  delete axiosOptions.headers.common['content-length']
 
   if (process.server) {
     // Don't accept brotli encoding because Node can't parse it
-    axiosOptions.headers.common['Accept-Encoding'] = 'gzip, deflate'
+    axiosOptions.headers.common['accept-encoding'] = 'gzip, deflate'
   }
 
   // Create new axios instance

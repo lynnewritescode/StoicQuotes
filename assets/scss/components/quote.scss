@@ -1,27 +1,33 @@
 .quote {
   margin: 20px 0;
-  color: #526488;
+  color: #484c7f;
   font-weight: 300;
   font-size: 3.2rem;
   line-height: 36px;
   word-spacing: 5px;
   display: block;
-  max-width: 600px;
-  font-family: 'Playfair Display', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  max-width: 900px;
+  font-family: 'Roboto Slab';
   quotes: '\201C' '\201D' '\2018' '\2019';
 
   &:before {
     content: open-quote;
+    display: block;
     font-size: 4em;
     line-height: 0.1em;
-    display: block;
+    font-family: 'Playfair Display', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
 }
 
-@media (min-width: 400px) {
+@media (min-width: 767px) {
   .quote {
     font-size: 4.4rem;
     line-height: 48px;
+    margin: 20px 0 35px;
+
+    &:before {
+      line-height: 0.3em;
+    }
   }
 
   .e-author {
@@ -30,27 +36,14 @@
   }
 }
 
-@media (min-width: 767px) {
+@media (min-width: 960px) {
   .quote {
-    font-size: 5.4rem;
+    font-size: 5rem;
     line-height: 60px;
   }
 
   .e-author {
     font-size: 2rem;
     line-height: 26px;
-  }
-}
-
-@media (min-width: 960px) {
-  .quote {
-    max-width: 900px;
-    font-size: 6.8rem;
-    line-height: 68px;
-  }
-
-  .e-author {
-    font-size: 2.2rem;
-    line-height: 28px;
   }
 }
