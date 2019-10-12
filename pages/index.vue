@@ -15,7 +15,6 @@
           :quote="quote"
           :author="author"
         />
-
       </main>
     </transition>
     <div class="call-to-action">
